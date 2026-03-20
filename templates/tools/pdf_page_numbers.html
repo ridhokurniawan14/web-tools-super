@@ -1,0 +1,114 @@
+<div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-2 border-b dark:border-gray-700 pb-4">🔢 Add Page Numbers</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Tambahkan nomor halaman pada dokumen PDF-mu dengan posisi dan format yang bisa disesuaikan.</p>
+
+    <div id="dropzone-pagenum" class="mb-5 border-2 border-dashed border-cyan-300 dark:border-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 rounded-xl transition-all relative overflow-hidden group">
+        <input type="file" id="pdfPageNumInput" accept="application/pdf"
+               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+               onchange="handlePageNumFile(this)"
+               ondragover="this.parentElement.classList.add('border-cyan-500', 'bg-cyan-100')"
+               ondragleave="this.parentElement.classList.remove('border-cyan-500', 'bg-cyan-100')"
+               ondrop="this.parentElement.classList.remove('border-cyan-500', 'bg-cyan-100')"
+               title="Klik atau Drag & Drop 1 PDF di sini">
+        
+        <div class="p-6 text-center pointer-events-none">
+            <svg class="w-10 h-10 mx-auto text-cyan-500 mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path></svg>
+            <p class="text-cyan-700 dark:text-cyan-400 font-bold" id="pageNumFileName">Pilih 1 File PDF di sini</p>
+        </div>
+    </div>
+
+    <div class="bg-gray-50 dark:bg-gray-700/50 p-5 rounded-2xl border border-gray-200 dark:border-gray-600 mb-6 space-y-4">
+        
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Posisi Nomor:</label>
+            <select id="pageNumPos" class="w-full px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 cursor-pointer">
+                <option value="bottom_center">Tengah Bawah</option>
+                <option value="bottom_right">Kanan Bawah</option>
+                <option value="bottom_left">Kiri Bawah</option>
+                <option value="top_center">Tengah Atas</option>
+                <option value="top_right">Kanan Atas</option>
+                <option value="top_left">Kiri Atas</option>
+            </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1">
+                    Format Teks:
+                    <span class="text-[10px] bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-500 dark:text-gray-400" title="{n} adalah angka halaman">{n}</span>
+                </label>
+                <select id="pageNumFormat" class="w-full px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 cursor-pointer">
+                    <option value="{n}">1, 2, 3...</option>
+                    <option value="Hal {n}">Hal 1, Hal 2...</option>
+                    <option value="Page {n}">Page 1, Page 2...</option>
+                    <option value="- {n} -">- 1 -, - 2 -...</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Mulai dari Angka:</label>
+                <input type="number" id="pageNumStart" value="1" min="1" class="w-full px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+            </div>
+        </div>
+    </div>
+
+    <button onclick="processPageNumbers()" id="btnPageNum" disabled class="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-lg">
+        <span>Sisipkan Nomor Halaman</span>
+    </button>
+    <div id="loadingPageNum" class="hidden text-center mt-3 text-cyan-600 dark:text-cyan-400 text-sm animate-pulse font-medium">Menyisipkan nomor ke setiap lembar...</div>
+</div>
+
+<script>
+    let pageNumFileStore = null;
+
+    function handlePageNumFile(input) {
+        if (!input.files || input.files.length === 0) return;
+        const file = input.files[0];
+        
+        if (file.type !== "application/pdf") { 
+            showToast("Hanya menerima file PDF bro!", "error"); 
+            return; 
+        }
+
+        pageNumFileStore = file;
+        document.getElementById('pageNumFileName').innerText = "✓ " + file.name;
+        document.getElementById('btnPageNum').disabled = false;
+    }
+
+    async function processPageNumbers() {
+        if (!pageNumFileStore) return;
+
+        const btn = document.getElementById('btnPageNum');
+        const loading = document.getElementById('loadingPageNum');
+        btn.classList.add('hidden'); loading.classList.remove('hidden');
+
+        const formData = new FormData();
+        formData.append("pdf_file", pageNumFileStore);
+        formData.append("position", document.getElementById('pageNumPos').value);
+        formData.append("format_text", document.getElementById('pageNumFormat').value);
+        formData.append("start_num", document.getElementById('pageNumStart').value);
+
+        try {
+            const response = await fetch('/add-page-numbers', { method: 'POST', body: formData });
+            if (response.ok) {
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    showToast((await response.json()).error, "error");
+                } else {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); 
+                    a.href = url; 
+                    let baseName = pageNumFileStore.name.replace(/\.pdf$/i, "");
+                    a.download = `Numbered_${baseName}.pdf`;
+                    document.body.appendChild(a); a.click(); a.remove(); 
+                    
+                    showToast("Nomor halaman berhasil disisipkan!", "success");
+                    
+                    // Reset input
+                    document.getElementById('pdfPageNumInput').value = '';
+                }
+            } else { showToast("Gagal memproses PDF.", "error"); }
+        } catch (error) { showToast("Koneksi bermasalah bro.", "error"); } 
+        finally { btn.classList.remove('hidden'); loading.classList.add('hidden'); }
+    }
+</script>

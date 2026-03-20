@@ -1,0 +1,183 @@
+<div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-2 border-b dark:border-gray-700 pb-4">📑 Organize / Delete PDF</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Hapus halaman yang tidak perlu, atau geser (drag & drop) halaman untuk mengubah urutannya.</p>
+
+    <div id="org-upload-area">
+        <div class="mb-5 border-2 border-dashed border-purple-300 dark:border-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-xl transition-all relative overflow-hidden group">
+            <input type="file" id="orgInput" accept="application/pdf"
+                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                   onchange="handleOrgFile(this)"
+                   ondragover="this.parentElement.classList.add('border-purple-500', 'bg-purple-100')"
+                   ondragleave="this.parentElement.classList.remove('border-purple-500', 'bg-purple-100')"
+                   ondrop="this.parentElement.classList.remove('border-purple-500', 'bg-purple-100')"
+                   title="Klik atau Drag & Drop PDF di sini">
+            
+            <div class="p-8 text-center pointer-events-none">
+                <svg class="w-12 h-12 mx-auto text-purple-400 dark:text-purple-500 mb-3 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                <p class="text-purple-700 dark:text-purple-400 font-bold text-lg">Upload 1 File PDF</p>
+            </div>
+        </div>
+        <div id="loadingOrgUpload" class="hidden text-center text-purple-600 dark:text-purple-400 text-sm font-medium animate-pulse">Membongkar halaman PDF... tunggu sebentar...</div>
+    </div>
+
+    <div id="org-workspace" class="hidden">
+        <div class="flex justify-between items-center mb-4 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg border border-purple-100 dark:border-purple-800">
+            <p class="text-sm font-bold text-purple-700 dark:text-purple-400" id="orgFileNameDisplay">Nama File.pdf</p>
+            <span class="text-xs bg-purple-200 dark:bg-purple-700 text-purple-800 dark:text-purple-200 px-2 py-1 rounded font-bold" id="orgPageCountDisplay">0 Halaman</span>
+        </div>
+
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3 uppercase font-bold tracking-wider">Geser untuk memindahkan, klik ❌ untuk menghapus.</p>
+
+        <ul id="org-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 mb-6 max-h-[400px] overflow-y-auto p-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner">
+            </ul>
+
+        <div class="flex gap-3">
+            <button onclick="resetOrg()" class="w-1/3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold py-3 px-4 rounded-xl transition-colors">
+                Batal
+            </button>
+            <button onclick="processSaveOrg()" id="btnSaveOrg" class="w-2/3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-lg">
+                <span>Simpan PDF Baru</span>
+            </button>
+        </div>
+        <div id="loadingOrgSave" class="hidden text-center mt-3 text-purple-600 dark:text-purple-400 text-sm animate-pulse font-medium">Merakit PDF baru... mohon tunggu...</div>
+    </div>
+</div>
+
+<script>
+    let orgFileId = null;
+    let orgOriginalName = "";
+    let sortableInst = null;
+
+    async function handleOrgFile(input) {
+        if (!input.files || input.files.length === 0) return;
+        const file = input.files[0];
+        
+        if (file.type !== "application/pdf") { 
+            showToast("Hanya menerima file PDF bro!", "error"); 
+            return; 
+        }
+
+        orgOriginalName = file.name;
+        document.getElementById('orgInput').value = '';
+        document.getElementById('org-upload-area').querySelector('.group').classList.add('hidden');
+        document.getElementById('loadingOrgUpload').classList.remove('hidden');
+
+        const formData = new FormData();
+        formData.append("pdf_file", file);
+
+        try {
+            const response = await fetch('/analyze-organize', { method: 'POST', body: formData });
+            const data = await response.json();
+
+            if (data.error) {
+                showToast(data.error, "error");
+                resetOrg();
+            } else {
+                orgFileId = data.id;
+                document.getElementById('orgFileNameDisplay').innerText = data.filename;
+                
+                renderOrgGrid(data.pages);
+                
+                document.getElementById('org-upload-area').classList.add('hidden');
+                document.getElementById('org-workspace').classList.remove('hidden');
+            }
+        } catch (error) { 
+            showToast("Gagal mengupload PDF.", "error"); 
+            resetOrg();
+        } finally {
+            document.getElementById('loadingOrgUpload').classList.add('hidden');
+            document.getElementById('org-upload-area').querySelector('.group').classList.remove('hidden');
+        }
+    }
+
+    function renderOrgGrid(totalPages) {
+        const grid = document.getElementById('org-grid');
+        grid.innerHTML = '';
+        document.getElementById('orgPageCountDisplay').innerText = `${totalPages} Halaman`;
+
+        for (let i = 0; i < totalPages; i++) {
+            const li = document.createElement('li');
+            li.className = "relative bg-white dark:bg-gray-700 p-2 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 cursor-grab group transform transition-transform hover:scale-105";
+            li.dataset.pageIndex = i; // Simpan index asli halaman
+            
+            li.innerHTML = `
+                <div class="aspect-[1/1.4] w-full bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center overflow-hidden mb-2">
+                    <img src="/preview-organize-page/${orgFileId}/${i}" class="w-full h-full object-contain pointer-events-none" alt="Hal ${i+1}">
+                </div>
+                <div class="text-center text-xs font-bold text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400">Hal ${i+1}</div>
+                
+                <button onclick="removeOrgPage(this)" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100" title="Hapus Halaman">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            `;
+            grid.appendChild(li);
+        }
+
+        // Aktifkan Sortable JS biar bisa di drag and drop
+        if(sortableInst) sortableInst.destroy();
+        sortableInst = new Sortable(grid, {
+            animation: 150,
+            ghostClass: 'opacity-50',
+            onEnd: function() { updateOrgPageCount(); }
+        });
+    }
+
+    function removeOrgPage(btnEl) {
+        btnEl.parentElement.remove();
+        updateOrgPageCount();
+    }
+
+    function updateOrgPageCount() {
+        const remaining = document.querySelectorAll('#org-grid li').length;
+        document.getElementById('orgPageCountDisplay').innerText = `${remaining} Halaman Tersisa`;
+    }
+
+    async function processSaveOrg() {
+        const pagesEls = document.querySelectorAll('#org-grid li');
+        if (pagesEls.length === 0) {
+            showToast("Tidak ada halaman yang tersisa bro!", "error");
+            return;
+        }
+
+        // Ambil susunan index baru dari grid
+        const newOrder = Array.from(pagesEls).map(li => li.dataset.pageIndex).join(",");
+
+        const btn = document.getElementById('btnSaveOrg');
+        const loading = document.getElementById('loadingOrgSave');
+        btn.classList.add('hidden'); loading.classList.remove('hidden');
+
+        const formData = new FormData();
+        formData.append("file_id", orgFileId);
+        formData.append("pages", newOrder);
+
+        try {
+            const response = await fetch('/process-organize', { method: 'POST', body: formData });
+            if (response.ok) {
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    showToast((await response.json()).error, "error");
+                } else {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); 
+                    a.href = url; 
+                    let baseName = orgOriginalName.replace(/\.pdf$/i, "");
+                    a.download = `Organized_${baseName}.pdf`;
+                    document.body.appendChild(a); a.click(); a.remove(); 
+                    
+                    showToast("PDF Berhasil dirakit ulang!", "success");
+                    resetOrg(); // Kembali ke awal
+                }
+            } else { showToast("Gagal memproses PDF.", "error"); }
+        } catch (error) { showToast("Koneksi bermasalah bro.", "error"); } 
+        finally { btn.classList.remove('hidden'); loading.classList.add('hidden'); }
+    }
+
+    function resetOrg() {
+        orgFileId = null;
+        orgOriginalName = "";
+        document.getElementById('org-grid').innerHTML = '';
+        document.getElementById('org-workspace').classList.add('hidden');
+        document.getElementById('org-upload-area').classList.remove('hidden');
+    }
+</script>

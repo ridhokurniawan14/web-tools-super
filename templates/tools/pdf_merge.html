@@ -1,0 +1,107 @@
+<div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-2 border-b dark:border-gray-700 pb-4">📑 Combine / Merge PDF</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Pilih file, atur urutannya dengan cara ditarik (drag), lalu gabungkan jadi satu!</p>
+
+    <div id="dropzone-merge" class="mb-6 border-2 border-dashed border-purple-300 dark:border-purple-600 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-xl transition-all relative overflow-hidden group">
+        <input type="file" id="pdfFileInput" accept="application/pdf" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleFilesAdded(this.files)" title="Klik atau Drag & Drop file di sini">
+        
+        <div class="p-10 text-center pointer-events-none">
+            <svg class="w-12 h-12 mx-auto text-purple-400 dark:text-purple-500 mb-3 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+            <p class="text-purple-700 dark:text-purple-400 font-bold text-lg">Klik atau Drag & Drop PDF di sini</p>
+            <p class="text-sm text-purple-500 dark:text-purple-500 mt-1">Bisa pilih/tarik banyak file sekaligus</p>
+        </div>
+    </div>
+
+    <ul id="pdf-sortable-list" class="space-y-2 mb-6 min-h-[10px]"></ul>
+
+    <button onclick="processMerge()" id="btnMerge" disabled class="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex justify-center items-center gap-2">
+        <span>Gabung PDF Sekarang</span>
+    </button>
+    <div id="loadingMerge" class="hidden text-center mt-3 text-purple-600 dark:text-purple-400 text-sm animate-pulse font-medium">Menyatukan dokumen... mohon tunggu...</div>
+</div>
+
+<script>
+    let pdfFileStore = {}; 
+    let pdfIdCounter = 0;
+
+    new Sortable(document.getElementById('pdf-sortable-list'), {
+        animation: 150, ghostClass: 'bg-purple-100', handle: '.drag-handle'
+    });
+
+    // Modifikasi fungsi agar menerima array/filelist langsung
+    function handleFilesAdded(files) {
+        if (files.length === 0) return;
+        const listContainer = document.getElementById('pdf-sortable-list');
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (file.type !== "application/pdf") {
+                showToast(`File ${file.name} bukan PDF!`, "error");
+                continue;
+            }
+
+            const uniqueId = 'pdf_item_' + pdfIdCounter++;
+            pdfFileStore[uniqueId] = file;
+
+            const li = document.createElement('li');
+            li.id = uniqueId;
+            li.className = "flex items-center justify-between bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 p-3 rounded-lg shadow-sm";
+            li.innerHTML = `
+                <div class="flex items-center gap-3 overflow-hidden">
+                    <div class="drag-handle cursor-move text-gray-400 hover:text-purple-500 p-1"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg></div>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate max-w-[200px] md:max-w-sm">${file.name}</span>
+                </div>
+                <button onclick="removePdfItem('${uniqueId}')" class="text-red-400 hover:text-red-600 p-1 rounded"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+            `;
+            listContainer.appendChild(li);
+        }
+        document.getElementById('pdfFileInput').value = '';
+        checkMergeButtonState();
+    }
+
+    // Efek visual saat drag file melayang di atas area
+    const dropzoneMerge = document.getElementById('dropzone-merge');
+    dropzoneMerge.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzoneMerge.classList.add('border-purple-500', 'bg-purple-100', 'dark:bg-purple-900/50');
+    });
+    dropzoneMerge.addEventListener('dragleave', () => {
+        dropzoneMerge.classList.remove('border-purple-500', 'bg-purple-100', 'dark:bg-purple-900/50');
+    });
+    dropzoneMerge.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzoneMerge.classList.remove('border-purple-500', 'bg-purple-100', 'dark:bg-purple-900/50');
+        handleFilesAdded(e.dataTransfer.files); // Tangkap file yang didrop
+    });
+
+    function removePdfItem(id) { delete pdfFileStore[id]; document.getElementById(id).remove(); checkMergeButtonState(); }
+    function checkMergeButtonState() { document.getElementById('btnMerge').disabled = document.querySelectorAll('#pdf-sortable-list li').length < 2; }
+
+    async function processMerge() {
+        const listItems = document.querySelectorAll('#pdf-sortable-list li');
+        const btn = document.getElementById('btnMerge');
+        const loading = document.getElementById('loadingMerge');
+
+        btn.classList.add('hidden'); loading.classList.remove('hidden');
+        const formData = new FormData();
+        
+        listItems.forEach(item => formData.append("pdf_files", pdfFileStore[item.id]));
+
+        try {
+            const response = await fetch('/merge-pdfs', { method: 'POST', body: formData });
+            if (response.ok) {
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    showToast((await response.json()).error, "error");
+                } else {
+                    const url = URL.createObjectURL(await response.blob());
+                    const a = document.createElement('a'); a.href = url; a.download = `Merged_Result.pdf`;
+                    document.body.appendChild(a); a.click(); a.remove(); 
+                    showToast("Mantap! PDF berhasil digabung.", "success");
+                    document.getElementById('pdf-sortable-list').innerHTML = ''; pdfFileStore = {}; checkMergeButtonState();
+                }
+            } else { showToast("Gagal gabung PDF bro.", "error"); }
+        } catch (error) { showToast("Gagal koneksi server.", "error"); } 
+        finally { btn.classList.remove('hidden'); loading.classList.add('hidden'); }
+    }
+</script>

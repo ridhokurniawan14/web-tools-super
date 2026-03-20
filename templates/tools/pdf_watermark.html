@@ -1,0 +1,155 @@
+<div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-2 border-b dark:border-gray-700 pb-4">©️ Add Watermark PDF</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">Lindungi dokumen PDF-mu dengan menambahkan cap air (Teks atau Gambar) yang transparan.</p>
+
+    <div id="dropzone-wm" class="mb-5 border-2 border-dashed border-teal-300 dark:border-teal-600 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/40 rounded-xl transition-all relative overflow-hidden group">
+        <input type="file" id="pdfWmInput" accept="application/pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleWmFile(this.files)" title="Klik atau Drag & Drop file PDF">
+        <div class="p-6 text-center pointer-events-none">
+            <svg class="w-10 h-10 mx-auto text-teal-400 mb-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            <p class="text-teal-700 dark:text-teal-400 font-bold" id="wmFileName">Pilih 1 File PDF di sini</p>
+        </div>
+    </div>
+
+    <div class="bg-gray-50 dark:bg-gray-700/50 p-5 rounded-2xl border border-gray-200 dark:border-gray-600 mb-6">
+        
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Tipe Watermark:</label>
+        <div class="flex gap-5 mb-5 border-b dark:border-gray-600 pb-4">
+            <label class="flex items-center gap-2.5 cursor-pointer text-gray-800 dark:text-gray-200 font-medium text-sm">
+                <input type="radio" name="wmType" value="text" checked onchange="toggleWmInput()" class="w-5 h-5 text-teal-600 focus:ring-teal-500 border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700"> Teks
+            </label>
+            <label class="flex items-center gap-2.5 cursor-pointer text-gray-800 dark:text-gray-200 font-medium text-sm">
+                <input type="radio" name="wmType" value="image" onchange="toggleWmInput()" class="w-5 h-5 text-teal-600 focus:ring-teal-500 border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700"> Gambar (Logo)
+            </label>
+        </div>
+
+        <div id="wmTextInputArea" class="mb-5 block">
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">Teks Watermark:</label>
+            <input type="text" id="wmText" placeholder="Misal: RAHASIA, DRAFT, NAMA ANDA..." 
+                   class="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500 placeholder:gray-400">
+        </div>
+
+        <div id="wmImageInputArea" class="mb-5 hidden fade-in">
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">Upload Logo (PNG/JPG Transparan):</label>
+            <input type="file" id="wmImage" accept="image/*" 
+                   class="w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-teal-100 dark:file:bg-teal-900/30 file:text-teal-700 dark:file:text-teal-400 hover:file:bg-teal-200 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-1.5">
+        </div>
+
+        <div class="flex items-center gap-5 pt-2">
+            <div class="flex-shrink-0 w-24 h-24 bg-white dark:bg-gray-800 rounded-2xl shadow-inner border border-gray-100 dark:border-gray-600 flex items-center justify-center overflow-hidden relative">
+                <p id="wmTextPreview" class="text-xl font-bold text-gray-400 dark:text-gray-500 transition-transform duration-75 rotate-45 select-none origin-center text-center">
+                    SAMPLE
+                </p>
+                <div id="wmImagePreview" class="hidden transition-transform duration-75 rotate-45 select-none origin-center flex flex-col items-center justify-center border-2 border-dashed border-teal-500 bg-teal-50 dark:bg-teal-900/50 text-teal-600 dark:text-teal-400 rounded-lg p-2 w-16 h-16 shadow-sm">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span class="text-[10px] font-extrabold mt-0.5 tracking-wider">LOGO</span>
+                </div>
+            </div>
+
+            <div class="flex-1">
+                <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 flex justify-between font-medium">
+                    Rotasi Cap Air (Derajat): <span id="rotValue" class="font-bold text-teal-600 dark:text-teal-400 text-sm">45°</span>
+                </label>
+                <input type="range" id="wmRotation" min="0" max="360" value="45" 
+                       oninput="updateRotationPreview(this.value)" 
+                       class="w-full h-2 accent-teal-600 cursor-pointer">
+            </div>
+        </div>
+    </div>
+
+    <button onclick="processWatermark()" id="btnWm" disabled 
+            class="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-lg">
+        <span>Terapkan Watermark</span>
+    </button>
+    <div id="loadingWm" class="hidden text-center mt-3 text-teal-600 dark:text-teal-400 text-sm animate-pulse font-medium">Menyisipkan watermark...</div>
+</div>
+
+<script>
+    let wmPdfFile = null;
+
+    function handleWmFile(files) {
+        if (files.length === 0) return;
+        const file = files[0];
+        if (file.type !== "application/pdf") { showToast("File harus PDF bro!", "error"); return; }
+        
+        wmPdfFile = file;
+        document.getElementById('wmFileName').innerText = "✓ " + file.name;
+        document.getElementById('btnWm').disabled = false;
+    }
+
+    // Ganti UI antara Teks dan Gambar + Ganti Preview
+    function toggleWmInput() {
+        const type = document.querySelector('input[name="wmType"]:checked').value;
+        if (type === 'text') {
+            document.getElementById('wmTextInputArea').classList.remove('hidden');
+            document.getElementById('wmImageInputArea').classList.add('hidden');
+            // Tampilkan preview teks
+            document.getElementById('wmTextPreview').classList.remove('hidden');
+            document.getElementById('wmImagePreview').classList.add('hidden');
+        } else {
+            document.getElementById('wmTextInputArea').classList.add('hidden');
+            document.getElementById('wmImageInputArea').classList.remove('hidden');
+            // Tampilkan preview gambar
+            document.getElementById('wmTextPreview').classList.add('hidden');
+            document.getElementById('wmImagePreview').classList.remove('hidden');
+        }
+    }
+
+    // FUNGSI BARU: Update angka derajat dan Putar elemen preview
+    function updateRotationPreview(value) {
+        // Update label angka
+        document.getElementById('rotValue').innerText = value + '°';
+        
+        // Putar preview teks dan gambar
+        const textPreview = document.getElementById('wmTextPreview');
+        const imagePreview = document.getElementById('wmImagePreview');
+        
+        // Gunakan transform rotate secara langsung via JS
+        textPreview.style.transform = `rotate(${value}deg)`;
+        imagePreview.style.transform = `rotate(${value}deg)`;
+    }
+
+    // Drag events
+    const dropzoneWm = document.getElementById('dropzone-wm');
+    dropzoneWm.addEventListener('dragover', (e) => { e.preventDefault(); dropzoneWm.classList.add('border-teal-500', 'bg-teal-100'); });
+    dropzoneWm.addEventListener('dragleave', () => dropzoneWm.classList.remove('border-teal-500', 'bg-teal-100'));
+    dropzoneWm.addEventListener('drop', (e) => { e.preventDefault(); dropzoneWm.classList.remove('border-teal-500', 'bg-teal-100'); handleWmFile(e.dataTransfer.files); });
+
+    async function processWatermark() {
+        if (!wmPdfFile) return;
+
+        const type = document.querySelector('input[name="wmType"]:checked').value;
+        const textVal = document.getElementById('wmText').value;
+        const imgFile = document.getElementById('wmImage').files[0];
+        const rotVal = document.getElementById('wmRotation').value;
+
+        if (type === 'text' && !textVal) { showToast("Teks cap air belum diisi bro!", "error"); return; }
+        if (type === 'image' && !imgFile) { showToast("Gambar logo belum dipilih bro!", "error"); return; }
+
+        const btn = document.getElementById('btnWm');
+        const loading = document.getElementById('loadingWm');
+        btn.classList.add('hidden'); loading.classList.remove('hidden');
+
+        const formData = new FormData();
+        formData.append("pdf_file", wmPdfFile);
+        formData.append("wm_type", type);
+        formData.append("rotation", rotVal);
+        if (type === 'text') formData.append("text", textVal);
+        if (type === 'image') formData.append("image", imgFile);
+
+        try {
+            const response = await fetch('/watermark-pdf', { method: 'POST', body: formData });
+            if (response.ok) {
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    showToast((await response.json()).error, "error");
+                } else {
+                    const url = URL.createObjectURL(await response.blob());
+                    const a = document.createElement('a'); a.href = url; a.download = `Watermarked_${wmPdfFile.name}`;
+                    document.body.appendChild(a); a.click(); a.remove(); 
+                    showToast("Watermark berhasil dipasang!", "success");
+                }
+            } else { showToast("Gagal memasang watermark bro.", "error"); }
+        } catch (error) { showToast("Koneksi bermasalah bro.", "error"); } 
+        finally { btn.classList.remove('hidden'); loading.classList.add('hidden'); }
+    }
+</script>

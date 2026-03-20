@@ -1,0 +1,166 @@
+<div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-2 border-b dark:border-gray-700 pb-4">📝 PDF to Word Converter</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Ubah banyak file PDF sekaligus menjadi dokumen Word (.docx) agar bisa diedit kembali.</p>
+
+    <div id="p2w-upload-area">
+        <div id="dropzone-p2w" class="mb-4 border-2 border-dashed border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl transition-all relative overflow-hidden group">
+            <input type="file" id="pdfP2WInput" accept="application/pdf" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleP2WFiles(this.files)" title="Klik atau Drag & Drop file di sini">
+            
+            <div class="p-8 text-center pointer-events-none">
+                <svg class="w-12 h-12 mx-auto text-blue-400 dark:text-blue-500 mb-3 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <p class="text-blue-700 dark:text-blue-400 font-bold text-lg">Klik atau Drag & Drop PDF di sini</p>
+                <p class="text-sm text-blue-500 mt-1">Bisa pilih banyak file sekaligus lho!</p>
+            </div>
+        </div>
+
+        <ul id="p2w-file-list" class="space-y-2 mb-6 max-h-48 overflow-y-auto pr-2"></ul>
+
+        <button onclick="processP2W()" id="btnP2W" disabled class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-lg">
+            <span>Mulai Konversi ke Word</span>
+        </button>
+        <div id="loadingP2W" class="hidden text-center mt-3 text-blue-600 dark:text-blue-400 text-sm animate-pulse font-medium">Sedang merakit dokumen Word... proses ini butuh sedikit waktu...</div>
+    </div>
+
+    <div id="p2w-result-area" class="hidden">
+        <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-5 mb-6 text-center">
+            <p class="text-green-600 dark:text-green-400 font-bold text-lg mb-1">🎉 Konversi Selesai!</p>
+            <p class="text-sm text-green-700 dark:text-green-500 mb-4">Semua file PDF berhasil diubah ke format Word.</p>
+            
+            <button onclick="downloadAllWord()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-md">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                Download Semua (.ZIP)
+            </button>
+        </div>
+
+        <p class="text-xs font-bold text-gray-400 dark:text-gray-500 mb-3 uppercase">Atau Download Satuan:</p>
+        <ul id="p2w-result-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto pr-2">
+            </ul>
+
+        <button onclick="resetP2W()" class="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-semibold py-3 px-4 rounded-xl transition-colors">
+            Konversi File Lainnya
+        </button>
+    </div>
+</div>
+
+<script>
+    let p2wFilesStore = {};
+    let p2wIdCounter = 0;
+    let convertedFileIds = []; // Untuk simpan ID buat di-ZIP
+
+    function handleP2WFiles(files) {
+        if (files.length === 0) return;
+        const listContainer = document.getElementById('p2w-file-list');
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (file.type !== "application/pdf") { showToast(`File ${file.name} bukan PDF!`, "error"); continue; }
+
+            const uniqueId = 'p2w_item_' + p2wIdCounter++;
+            p2wFilesStore[uniqueId] = file;
+
+            const li = document.createElement('li');
+            li.id = uniqueId;
+            li.className = "flex items-center justify-between bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 p-3 rounded-lg";
+            li.innerHTML = `
+                <div class="flex items-center gap-3 overflow-hidden">
+                    <svg class="w-5 h-5 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"></path></svg>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate max-w-[200px] md:max-w-sm">${file.name}</span>
+                </div>
+                <button onclick="removeP2WItem('${uniqueId}')" class="text-red-400 hover:text-red-600 p-1 rounded transition-colors" title="Batal">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            `;
+            listContainer.appendChild(li);
+        }
+        document.getElementById('pdfP2WInput').value = '';
+        checkP2WButtonState();
+    }
+
+    function removeP2WItem(id) {
+        delete p2wFilesStore[id];
+        document.getElementById(id).remove();
+        checkP2WButtonState();
+    }
+
+    function checkP2WButtonState() {
+        const fileCount = Object.keys(p2wFilesStore).length;
+        document.getElementById('btnP2W').disabled = fileCount === 0;
+    }
+
+    const dropzoneP2W = document.getElementById('dropzone-p2w');
+    dropzoneP2W.addEventListener('dragover', (e) => { e.preventDefault(); dropzoneP2W.classList.add('border-blue-500', 'bg-blue-100'); });
+    dropzoneP2W.addEventListener('dragleave', () => dropzoneP2W.classList.remove('border-blue-500', 'bg-blue-100'));
+    dropzoneP2W.addEventListener('drop', (e) => { e.preventDefault(); dropzoneP2W.classList.remove('border-blue-500', 'bg-blue-100'); handleP2WFiles(e.dataTransfer.files); });
+
+    async function processP2W() {
+        const fileKeys = Object.keys(p2wFilesStore);
+        if (fileKeys.length === 0) return;
+
+        const btn = document.getElementById('btnP2W');
+        const loading = document.getElementById('loadingP2W');
+        btn.classList.add('hidden'); loading.classList.remove('hidden');
+
+        const formData = new FormData();
+        fileKeys.forEach(key => formData.append("pdf_files", p2wFilesStore[key]));
+
+        try {
+            const response = await fetch('/pdf-to-word-batch', { method: 'POST', body: formData });
+            const data = await response.json();
+
+            if (data.error) {
+                showToast(data.error, "error");
+            } else {
+                // Sembunyikan Fase 1, Munculkan Fase 2
+                document.getElementById('p2w-upload-area').classList.add('hidden');
+                document.getElementById('p2w-result-area').classList.remove('hidden');
+                
+                const resultList = document.getElementById('p2w-result-list');
+                resultList.innerHTML = '';
+                convertedFileIds = []; // Kosongkan array ZIP
+
+                // Buat list hasil konversi
+                data.files.forEach(file => {
+                    convertedFileIds.push(file.id); // Simpan ID untuk ZIP nanti
+
+                    const li = document.createElement('li');
+                    li.className = "flex items-center justify-between bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 p-3 rounded-xl shadow-sm";
+                    li.innerHTML = `
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <svg class="w-6 h-6 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">${file.name}</span>
+                        </div>
+                        <a href="/download-word/${file.id}" download="${file.name}" class="text-sm bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 hover:bg-blue-200 px-3 py-1.5 rounded-lg font-bold transition-colors whitespace-nowrap">
+                            Download
+                        </a>
+                    `;
+                    resultList.appendChild(li);
+                });
+                
+                showToast("Berhasil memproses semua dokumen!", "success");
+            }
+        } catch (error) { 
+            showToast("Koneksi bermasalah bro.", "error"); 
+        } finally { 
+            btn.classList.remove('hidden'); loading.classList.add('hidden'); 
+        }
+    }
+
+    // Fungsi untuk mendownload semua file sekaligus sebagai ZIP
+    function downloadAllWord() {
+        if (convertedFileIds.length === 0) return;
+        const idsParam = convertedFileIds.join(",");
+        window.open(`/download-word-zip?ids=${idsParam}`, '_blank');
+        showToast("Proses mengunduh ZIP...", "success");
+    }
+
+    // Fungsi untuk mereset tampilan kembali ke awal
+    function resetP2W() {
+        p2wFilesStore = {};
+        convertedFileIds = [];
+        document.getElementById('p2w-file-list').innerHTML = '';
+        document.getElementById('btnP2W').disabled = true;
+        
+        document.getElementById('p2w-result-area').classList.add('hidden');
+        document.getElementById('p2w-upload-area').classList.remove('hidden');
+    }
+</script>

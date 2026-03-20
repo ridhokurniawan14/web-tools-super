@@ -1,0 +1,52 @@
+<div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-6 border-b dark:border-gray-700 pb-4">🖼️ Image Converter</h2>
+    
+    <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Pilih Gambar (JPG/PNG/WEBP):</label>
+    <input type="file" id="imageToConvert" accept="image/*" 
+           class="w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/30 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50 mb-4 bg-gray-50 dark:bg-gray-700 rounded-lg p-2 border border-gray-200 dark:border-gray-600">
+    
+    <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Konversi Ke Format:</label>
+    <select id="targetFormat" class="w-full px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 mb-6 bg-white dark:bg-gray-700 text-gray-800 dark:text-white outline-none">
+        <option value="webp">WebP (Sangat Ringan)</option>
+        <option value="jpeg">JPG / JPEG</option>
+    </select>
+
+    <button onclick="convertImage()" id="btnConvert"
+            class="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors">
+        Konversi Sekarang
+    </button>
+
+    <div id="loadingConvert" class="hidden text-center mt-3 text-blue-600 dark:text-blue-400 text-sm animate-pulse">
+        Memproses gambar... mohon tunggu sebentar.
+    </div>
+</div>
+
+<script>
+    async function convertImage() {
+        const imageFile = document.getElementById('imageToConvert').files[0];
+        const targetFormat = document.getElementById('targetFormat').value;
+        const btn = document.getElementById('btnConvert');
+        const loading = document.getElementById('loadingConvert');
+
+        if (!imageFile) { showToast("Pilih gambarnya dulu dong bro!", "error"); return; }
+
+        btn.classList.add('hidden'); loading.classList.remove('hidden');
+
+        const formData = new FormData();
+        formData.append("image", imageFile);
+        formData.append("format", targetFormat);
+
+        try {
+            const response = await fetch('/convert-image', { method: 'POST', body: formData });
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = `converted.${targetFormat}`;
+                document.body.appendChild(a); a.click(); a.remove(); 
+                showToast("Gambar berhasil dikonversi!", "success");
+            } else { showToast("Gagal mengonversi gambar bro.", "error"); }
+        } catch (error) { showToast("Gagal koneksi ke server.", "error"); } 
+        finally { btn.classList.remove('hidden'); loading.classList.add('hidden'); }
+    }
+</script>

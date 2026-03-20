@@ -1,0 +1,158 @@
+<div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-2 border-b dark:border-gray-700 pb-4">✂️ Split PDF (Pisah Lembar)</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Pecah 1 file PDF menjadi file PDF terpisah. Anda bisa mengunduh semuanya sekaligus atau melihat preview dan memilih lembar tertentu.</p>
+
+    <div id="split-upload-area">
+        <div id="dropzone-split" class="mb-4 border-2 border-dashed border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl transition-all relative overflow-hidden group">
+            <input type="file" id="pdfSplitInput" accept="application/pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleSplitFile(this.files)" title="Klik atau Drag & Drop file di sini">
+            
+            <div class="p-10 text-center pointer-events-none">
+                <svg class="w-12 h-12 mx-auto text-red-400 dark:text-red-500 mb-3 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <p class="text-red-700 dark:text-red-400 font-bold text-lg" id="splitFileName">Klik atau Drag & Drop 1 PDF di sini</p>
+                <p class="text-sm text-red-500 dark:text-red-500 mt-1" id="splitFileStatus">File belum dipilih</p>
+            </div>
+        </div>
+
+        <button onclick="processAnalyze()" id="btnAnalyze" disabled class="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex justify-center items-center gap-2">
+            <span>Analisa Dokumen</span>
+        </button>
+        <div id="loadingAnalyze" class="hidden text-center mt-3 text-red-600 dark:text-red-400 text-sm animate-pulse font-medium">Membaca halaman PDF... mohon tunggu...</div>
+    </div>
+
+    <div id="split-result-area" class="hidden">
+        <div class="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl p-4 mb-6 flex justify-between items-center">
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Dokumen siap dipisah:</p>
+                <h3 id="resultFileName" class="font-bold text-gray-800 dark:text-white text-lg truncate max-w-[200px] md:max-w-md">NamaFile.pdf</h3>
+                <p id="resultPageCount" class="text-sm font-semibold text-red-600 dark:text-red-400">Total: 10 Halaman</p>
+            </div>
+            <button onclick="resetSplit()" class="text-sm text-gray-500 hover:text-red-600 underline whitespace-nowrap ml-4">Upload Ulang</button>
+        </div>
+
+        <button onclick="downloadAll()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex justify-center items-center gap-2 mb-6 shadow-md">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Download Semua Halaman (.ZIP)
+        </button>
+
+        <div class="relative flex py-3 items-center mb-4">
+            <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+            <span class="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 text-sm font-medium">ATAU PILIH BERDASARKAN PREVIEW</span>
+            <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+        </div>
+
+        <div id="page-buttons-container" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto pr-2 pb-2">
+            </div>
+    </div>
+</div>
+
+<script>
+    let splitFileStore = null;
+    let currentPdfId = null;
+
+    function handleSplitFile(files) {
+        if (files.length === 0) return;
+        const file = files[0];
+        if (file.type !== "application/pdf") {
+            showToast("Harus file PDF bro!", "error");
+            return;
+        }
+
+        splitFileStore = file;
+        document.getElementById('splitFileName').innerText = file.name;
+        document.getElementById('splitFileStatus').innerText = "Siap diproses!";
+        document.getElementById('btnAnalyze').disabled = false;
+    }
+
+    const dropzoneSplit = document.getElementById('dropzone-split');
+    dropzoneSplit.addEventListener('dragover', (e) => { e.preventDefault(); dropzoneSplit.classList.add('border-red-500', 'bg-red-100'); });
+    dropzoneSplit.addEventListener('dragleave', () => dropzoneSplit.classList.remove('border-red-500', 'bg-red-100'));
+    dropzoneSplit.addEventListener('drop', (e) => {
+        e.preventDefault(); dropzoneSplit.classList.remove('border-red-500', 'bg-red-100');
+        handleSplitFile(e.dataTransfer.files);
+    });
+
+    async function processAnalyze() {
+        if (!splitFileStore) return;
+
+        const btn = document.getElementById('btnAnalyze');
+        const loading = document.getElementById('loadingAnalyze');
+        btn.classList.add('hidden'); loading.classList.remove('hidden');
+
+        const formData = new FormData();
+        formData.append("pdf_file", splitFileStore);
+
+        try {
+            const response = await fetch('/analyze-split', { method: 'POST', body: formData });
+            const data = await response.json();
+
+            if (data.error) {
+                showToast(data.error, "error");
+            } else {
+                currentPdfId = data.id; 
+                
+                document.getElementById('split-upload-area').classList.add('hidden');
+                document.getElementById('split-result-area').classList.remove('hidden');
+                
+                document.getElementById('resultFileName').innerText = data.filename;
+                document.getElementById('resultPageCount').innerText = `Total: ${data.pages} Halaman`;
+
+                const container = document.getElementById('page-buttons-container');
+                container.innerHTML = ''; 
+                
+                // Looping untuk membuat Card dengan Image Preview
+                for (let i = 0; i < data.pages; i++) {
+                    const cardHtml = `
+                        <div class="relative flex flex-col items-center bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-2 transition-all hover:border-red-400 dark:hover:border-red-500 shadow-sm group">
+                            
+                            <div class="w-full h-32 md:h-40 bg-white dark:bg-gray-800 rounded mb-3 overflow-hidden flex items-center justify-center border border-gray-100 dark:border-gray-600 relative">
+                                <img src="/preview-split-page/${currentPdfId}/${i}" alt="Hal ${i+1}" class="max-w-full max-h-full object-contain" loading="lazy">
+                                
+                                <button onclick="downloadPage(${i})" class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                    <span class="bg-red-500 text-white p-2 rounded-full">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                    </span>
+                                </button>
+                            </div>
+                            
+                            <div class="w-full flex justify-between items-center px-1">
+                                <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">Hal ${i + 1}</span>
+                                <button onclick="downloadPage(${i})" class="text-red-500 hover:text-red-700 dark:hover:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 p-1.5 rounded transition-colors" title="Download Halaman ${i + 1}">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', cardHtml);
+                }
+                showToast("Analisa & Preview selesai!", "success");
+            }
+        } catch (error) { 
+            showToast("Gagal koneksi server.", "error"); 
+        } finally { 
+            btn.classList.remove('hidden'); loading.classList.add('hidden'); 
+        }
+    }
+
+    function downloadAll() {
+        if (!currentPdfId) return;
+        window.open(`/download-split-all/${currentPdfId}`, '_blank');
+        showToast("Proses mengunduh ZIP...", "success");
+    }
+
+    function downloadPage(pageIndex) {
+        if (!currentPdfId) return;
+        window.open(`/download-split-page/${currentPdfId}/${pageIndex}`, '_blank');
+    }
+
+    function resetSplit() {
+        splitFileStore = null;
+        currentPdfId = null;
+        document.getElementById('pdfSplitInput').value = '';
+        document.getElementById('splitFileName').innerText = "Klik atau Drag & Drop 1 PDF di sini";
+        document.getElementById('splitFileStatus').innerText = "File belum dipilih";
+        document.getElementById('btnAnalyze').disabled = true;
+        
+        document.getElementById('split-result-area').classList.add('hidden');
+        document.getElementById('split-upload-area').classList.remove('hidden');
+    }
+</script>
