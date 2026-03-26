@@ -38,15 +38,31 @@
 
         try {
             const response = await fetch('/convert-image', { method: 'POST', body: formData });
+            
             if (response.ok) {
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = `converted.${targetFormat}`;
-                document.body.appendChild(a); a.click(); a.remove(); 
-                showToast("Gambar berhasil dikonversi!", "success");
-            } else { showToast("Gagal mengonversi gambar bro.", "error"); }
-        } catch (error) { showToast("Gagal koneksi ke server.", "error"); } 
-        finally { btn.classList.remove('hidden'); loading.classList.add('hidden'); }
+                // KUNCI PERBAIKAN: Cek dulu isi amplopnya (teks JSON atau gambar asli)
+                const contentType = response.headers.get("content-type");
+                
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    // Kalau isinya JSON, berarti ini tilangan dari Satpam Anti-Spam
+                    const data = await response.json();
+                    showToast(data.error, "error");
+                } else {
+                    // Kalau bukan JSON, langsung sikat download gambarnya!
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = `converted.${targetFormat}`;
+                    document.body.appendChild(a); a.click(); a.remove(); 
+                    showToast("Gambar berhasil dikonversi!", "success");
+                }
+            } else { 
+                showToast("Gagal mengonversi gambar bro.", "error"); 
+            }
+        } catch (error) { 
+            showToast("Gagal koneksi ke server.", "error"); 
+        } finally { 
+            btn.classList.remove('hidden'); loading.classList.add('hidden'); 
+        }
     }
 </script>

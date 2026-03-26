@@ -52,15 +52,31 @@
 
         try {
             const response = await fetch('/generate-qr', { method: 'POST', body: formData });
+            
             if (response.ok) {
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                document.getElementById('qrResult').src = url;
-                document.getElementById('downloadBtn').href = url;
-                document.getElementById('resultContainer').classList.remove('hidden');
-                showToast("QR Code berhasil dibuat!", "success");
-            } else { showToast("Waduh, ada error saat generate QR bro.", "error"); }
-        } catch (error) { showToast("Gagal koneksi ke server.", "error"); }
-        finally { btn.innerText = "Generate QR Code"; btn.disabled = false; }
+                // 1. CEK DULU ISI BALASANNYA APA
+                const contentType = response.headers.get("content-type");
+                
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    // 2. KALAU ISINYA JSON (Berarti ini surat tilang dari Satpam Anti-Spam)
+                    const data = await response.json();
+                    showToast(data.error, "error");
+                } else {
+                    // 3. KALAU BUKAN JSON (Berarti beneran gambar QR Code)
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    document.getElementById('qrResult').src = url;
+                    document.getElementById('downloadBtn').href = url;
+                    document.getElementById('resultContainer').classList.remove('hidden');
+                    showToast("QR Code berhasil dibuat!", "success");
+                }
+            } else { 
+                showToast("Waduh, ada error saat generate QR bro.", "error"); 
+            }
+        } catch (error) { 
+            showToast("Gagal koneksi ke server.", "error"); 
+        } finally { 
+            btn.innerText = "Generate QR Code"; btn.disabled = false; 
+        }
     }
 </script>

@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 import os
+import time
 
 # Import semua router
 from routers import (
@@ -12,6 +13,41 @@ from routers import (
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+
+# ==========================================
+# MIDDLEWARE ANTI-SPAM (THROTTLE)
+# ==========================================
+ip_request_tracker = {}
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    # KUNCI PERBAIKAN: Bebaskan request GET (Load halaman web) dari tilangan
+    if request.method == "GET":
+        return await call_next(request)
+
+    client_ip = request.client.host
+    current_time = time.time()
+    
+    # Bersihkan memori dari IP yang requestnya sudah lebih dari 60 detik (1 menit) yang lalu
+    if client_ip in ip_request_tracker:
+        ip_request_tracker[client_ip] = [t for t in ip_request_tracker[client_ip] if current_time - t < 60]
+    else:
+        ip_request_tracker[client_ip] = []
+
+    # BATAS: 30 Request per menit per IP (Hanya untuk fitur berat / POST)
+    if len(ip_request_tracker[client_ip]) >= 30:
+        return JSONResponse(
+            status_code=200, 
+            content={"error": "Sabar bro! Jangan spam klik, tunggu 1 menit lagi ya. 🛑"}
+        )
+
+    # Catat waktu request IP ini
+    ip_request_tracker[client_ip].append(current_time)
+    
+    # Lanjut proses request ke sistem
+    response = await call_next(request)
+    return response
+# ==========================================
 
 # Daftarkan semua routernya
 app.include_router(qrcode.router)
